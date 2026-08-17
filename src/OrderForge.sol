@@ -81,9 +81,10 @@ contract OrderForge is IOrderForge, EIP712, ReentrancyGuard {
 
         uint128 newFilled = alreadyFilled + sellFillAmount;
 
-        // Cumulative rounding avoids per-fill drift: the final fill always totals exactly buyAmount.
-        uint256 buyBefore = Math.mulDiv(alreadyFilled, order.buyAmount, order.sellAmount, Math.Rounding.Ceil);
-        uint256 buyAfter = Math.mulDiv(newFilled, order.buyAmount, order.sellAmount, Math.Rounding.Ceil);
+        // Cumulative floor rounding avoids per-fill drift and never makes an accepted fill free.
+        // Tiny fills below the buy token's smallest-unit resolution revert via ZeroBuyFill.
+        uint256 buyBefore = Math.mulDiv(alreadyFilled, order.buyAmount, order.sellAmount);
+        uint256 buyAfter = Math.mulDiv(newFilled, order.buyAmount, order.sellAmount);
         buyFillAmount = buyAfter - buyBefore;
         if (buyFillAmount == 0) revert ZeroBuyFill();
 

@@ -18,7 +18,7 @@ OrderForge turns ABI encoding and hashing concepts into a cohesive protocol rath
 - EOA plus ERC-1271 smart-wallet signature verification;
 - deterministic market and position identifiers;
 - order lifecycle design: expiry, restricted takers, cancellation, nonce invalidation and nonce binding;
-- safe partial-fill accounting with cumulative rounding;
+- safe partial-fill accounting with cumulative floor rounding;
 - `SafeERC20`, checks-effects-interactions and reentrancy protection;
 - unit, fuzz and **stateful invariant** testing with Foundry;
 - explicit threat model, architecture and security assumptions.
@@ -71,10 +71,10 @@ Orders are signed using the EIP-712 domain `OrderForge`, version `1`, the curren
 For partial fills, cumulative buy obligation is:
 
 ```text
-ceil(cumulativeSellFilled * buyAmount / sellAmount)
+floor(cumulativeSellFilled * buyAmount / sellAmount)
 ```
 
-Each fill pays only the delta from the previous cumulative obligation. This makes the final total exactly `buyAmount` without exploitable repeated rounding drift.
+Each fill pays only the delta from the previous cumulative obligation. This makes the final total exactly `buyAmount` without exploitable repeated rounding drift. A fill below the buy token's smallest-unit resolution is rejected instead of transferring sell tokens for zero payment.
 
 ## ABI and hashing evidence
 
@@ -170,7 +170,7 @@ forge script script/Deploy.s.sol:DeployOrderForge \
 - The contract provides settlement, not price discovery, oracle validation or MEV protection.
 - Makers and takers must deliberately grant token allowances.
 - ERC-1271 validity is delegated to the maker contract wallet.
-- Cumulative rounding can shift smallest-unit dust between successive partial fillers. A fill that would require zero buy-token units is rejected; integrations should still use sensible minimum fill sizes.
+- Cumulative floor rounding prevents repeated rounding drift. A fill that is too small to advance the buy token by at least one smallest unit is rejected; integrations should still use sensible minimum fill sizes.
 - This implementation has **not been audited**.
 
 Read [SECURITY.md](SECURITY.md) and the detailed [threat model](docs/THREAT-MODEL.md).

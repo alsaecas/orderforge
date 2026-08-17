@@ -22,7 +22,7 @@ Restricted orders compare `allowedTaker` to `msg.sender` before state changes or
 The contract records cumulative sell amount by order digest and reverts when a requested fill exceeds the exact remainder.
 
 ### Rounding extraction
-Payment is calculated from the delta between cumulative rounded obligations, preventing attackers from repeatedly exploiting independent per-fill rounding. A partial fill that would receive sell tokens while owing zero buy-token units is rejected.
+Payment is calculated from the delta between cumulative floor-rounded obligations, preventing attackers from repeatedly exploiting independent per-fill rounding. A partial fill that would receive sell tokens while owing zero buy-token units is rejected; a larger fill can cross the next smallest-unit payment boundary.
 
 ### Reentrancy
 Settlement is protected by `nonReentrant`, follows checks-effects-interactions and relies on atomic revert semantics if either transfer fails.

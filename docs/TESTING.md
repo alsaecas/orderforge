@@ -7,7 +7,7 @@ OrderForge uses complementary deterministic, fuzz and stateful invariant suites.
 The unit suite covers:
 
 - exact full settlement and zero contract custody;
-- cumulative rounding across partial fills, including rejection of zero-payment fills;
+- cumulative floor rounding across partial fills, including minimum-resolution rejection;
 - taker restrictions and expiry;
 - invalid signatures;
 - maker cancellation and nonce invalidation;

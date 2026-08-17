@@ -72,24 +72,25 @@ contract OrderForgeTest is Test {
         uint256 third = forge.fillOrder(order, signature, 1);
         vm.stopPrank();
 
-        assertEq(first, 4);
+        assertEq(first, 3);
         assertEq(second, 3);
-        assertEq(third, 3);
+        assertEq(third, 4);
         assertEq(first + second + third, order.buyAmount);
     }
 
-    function test_partialFillThatWouldPayZeroBuyUnitsReverts() external {
+    function test_partialFillBelowTokenResolutionRevertsButFullFillSucceeds() external {
         Order memory order = _order(10, 1, address(0), 14, keccak256("zero-buy-fill"));
         bytes memory signature = _sign(order, MAKER_PK);
 
-        vm.prank(taker);
-        assertEq(forge.fillOrder(order, signature, 1), 1);
-
         vm.expectRevert(OrderForge.ZeroBuyFill.selector);
         vm.prank(taker);
-        forge.fillOrder(order, signature, 1);
+        forge.fillOrder(order, signature, 9);
 
-        assertEq(forge.filledSellAmount(forge.hashOrder(order)), 1);
+        assertEq(forge.filledSellAmount(forge.hashOrder(order)), 0);
+
+        vm.prank(taker);
+        assertEq(forge.fillOrder(order, signature, 10), 1);
+        assertEq(forge.filledSellAmount(forge.hashOrder(order)), 10);
     }
 
     function test_restrictedTakerRejectsOtherCaller() external {
@@ -262,6 +263,117 @@ contract OrderForgeTest is Test {
         assertNotEq(first, codec.yieldPositionId(position));
     }
 
+    function test_orderStateAndRemainingTrackLifecycle() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 15, keccak256("state"));
+        bytes memory signature = _sign(order, MAKER_PK);
+
+        assertEq(uint8(forge.orderState(order)), uint8(IOrderForge.OrderState.Open));
+        assertEq(forge.remainingSellAmount(order), 100 ether);
+        assertEq(forge.boundOrderHash(maker, order.nonce), bytes32(0));
+        assertEq(forge.structHash(order), _structHashLocally(order));
+
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 25 ether);
+
+        bytes32 digest = forge.hashOrder(order);
+        assertEq(uint8(forge.orderState(order)), uint8(IOrderForge.OrderState.PartiallyFilled));
+        assertEq(forge.remainingSellAmount(order), 75 ether);
+        assertEq(forge.boundOrderHash(maker, order.nonce), digest);
+    }
+
+    function test_orderStateReportsExpiredWithoutSettlement() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 16, keccak256("state-expired"));
+        order.expiry = uint64(block.timestamp + 1);
+        vm.warp(block.timestamp + 2);
+        assertEq(uint8(forge.orderState(order)), uint8(IOrderForge.OrderState.Expired));
+    }
+
+    function test_orderStateReportsNonceInvalidated() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 17, keccak256("state-nonce"));
+        vm.prank(maker);
+        forge.invalidateNonce(order.nonce);
+        assertEq(uint8(forge.orderState(order)), uint8(IOrderForge.OrderState.NonceInvalidated));
+    }
+
+    function test_nonMakerCannotCancelOrder() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 18, keccak256("not-maker"));
+        vm.expectRevert(abi.encodeWithSelector(OrderForge.OnlyMaker.selector, taker, maker));
+        vm.prank(taker);
+        forge.cancelOrder(order);
+    }
+
+    function test_zeroMakerIsRejected() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 19, keccak256("zero-maker"));
+        order.maker = address(0);
+        vm.expectRevert(OrderForge.ZeroAddress.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, hex"", 1 ether);
+    }
+
+    function test_zeroSellTokenIsRejected() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 20, keccak256("zero-sell"));
+        order.sellToken = address(0);
+        vm.expectRevert(OrderForge.ZeroAddress.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, hex"", 1 ether);
+    }
+
+    function test_zeroBuyTokenIsRejected() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 21, keccak256("zero-buy"));
+        order.buyToken = address(0);
+        vm.expectRevert(OrderForge.ZeroAddress.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, hex"", 1 ether);
+    }
+
+    function test_sameTokenIsRejected() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 22, keccak256("same-token"));
+        order.buyToken = order.sellToken;
+        vm.expectRevert(OrderForge.SameToken.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, hex"", 1 ether);
+    }
+
+    function test_zeroSignedAmountsAreRejected() external {
+        Order memory zeroSell = _order(0, 200 ether, address(0), 23, keccak256("zero-sell-amount"));
+        vm.expectRevert(OrderForge.ZeroAmount.selector);
+        vm.prank(taker);
+        forge.fillOrder(zeroSell, hex"", 1);
+
+        Order memory zeroBuy = _order(100 ether, 0, address(0), 24, keccak256("zero-buy-amount"));
+        vm.expectRevert(OrderForge.ZeroAmount.selector);
+        vm.prank(taker);
+        forge.fillOrder(zeroBuy, hex"", 1);
+    }
+
+    function test_zeroFillIsRejected() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 25, keccak256("zero-fill"));
+        bytes memory signature = _sign(order, MAKER_PK);
+        vm.expectRevert(OrderForge.ZeroAmount.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 0);
+    }
+
+    function test_fillCannotExceedRemainingAmount() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 26, keccak256("overfill"));
+        bytes memory signature = _sign(order, MAKER_PK);
+
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 60 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(OrderForge.FillExceedsRemaining.selector, 41 ether, 40 ether));
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 41 ether);
+    }
+
+    function test_completedOrderHasNoRemainingSellAmount() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 27, keccak256("no-remaining"));
+        bytes memory signature = _sign(order, MAKER_PK);
+        vm.prank(taker);
+        forge.fillOrder(order, signature, order.sellAmount);
+        assertEq(forge.remainingSellAmount(order), 0);
+    }
+
     function _order(uint128 sellAmount, uint128 buyAmount, address allowedTaker, uint256 nonce, bytes32 salt)
         internal
         view
@@ -278,6 +390,26 @@ contract OrderForgeTest is Test {
             nonce: nonce,
             salt: salt
         });
+    }
+
+    function _structHashLocally(Order memory order) internal pure returns (bytes32) {
+        bytes32 typeHash = keccak256(
+            "Order(address maker,address allowedTaker,address sellToken,address buyToken,uint128 sellAmount,uint128 buyAmount,uint64 expiry,uint256 nonce,bytes32 salt)"
+        );
+        return keccak256(
+            abi.encode(
+                typeHash,
+                order.maker,
+                order.allowedTaker,
+                order.sellToken,
+                order.buyToken,
+                order.sellAmount,
+                order.buyAmount,
+                order.expiry,
+                order.nonce,
+                order.salt
+            )
+        );
     }
 
     function _sign(Order memory order, uint256 privateKey) internal view returns (bytes memory) {

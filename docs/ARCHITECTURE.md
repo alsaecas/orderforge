@@ -48,9 +48,9 @@ A fully filled order invalidates its nonce. A maker may also invalidate a nonce 
 
 For cumulative sell fill `x`, the maker must have cumulatively received:
 
-`ceil(x * buyAmount / sellAmount)`
+`floor(x * buyAmount / sellAmount)`
 
-Each fill charges the difference between the new and previous cumulative target. This avoids repeated rounding drift and guarantees that a completely filled order pays exactly `buyAmount`. With extremely low-decimal assets, smallest-unit rounding dust can be redistributed between successive takers. A partial fill whose cumulative delta would require zero buy-token units is rejected, and real integrations should still enforce economically sensible minimum fill sizes.
+Each fill charges the difference between the new and previous cumulative floor target. This avoids repeated rounding drift and guarantees that a completely filled order pays exactly `buyAmount`. If a proposed partial fill is smaller than the buy token’s smallest-unit resolution, the delta is zero and the fill reverts; the taker must submit a larger fill. Real integrations should still enforce economically sensible minimum fill sizes.
 
 ## No protocol custody
 

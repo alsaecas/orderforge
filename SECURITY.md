@@ -22,6 +22,6 @@ Please use GitHub private security advisories rather than opening a public issue
 - Explicit order cancellation and nonce invalidation.
 - Checks-effects-interactions and `ReentrancyGuard` around settlement.
 - `SafeERC20` for token transfers.
-- Cumulative proportional rounding so partial fills sum to the exact full-order price, while zero-payment fills are rejected.
+- Cumulative floor rounding so accepted partial fills never transfer sell tokens for zero payment and the full order still settles to the exact signed price.
 - No intended token custody by the settlement contract.
 - Stateful invariant tests assert no overfill, token conservation and zero protocol custody.
