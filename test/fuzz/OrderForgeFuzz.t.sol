@@ -37,7 +37,7 @@ contract OrderForgeFuzzTest is Test {
         uint128 rawBuyAmount,
         uint128 rawFill
     ) external {
-        uint128 sellAmount = uint128(bound(rawSellAmount, 1, type(uint95).max));
+        uint128 sellAmount = uint128(bound(rawSellAmount, 1, type(uint96).max / 2));
         uint128 buyAmount = uint128(bound(rawBuyAmount, sellAmount, type(uint96).max));
         uint128 fillAmount = uint128(bound(rawFill, 1, sellAmount));
 
