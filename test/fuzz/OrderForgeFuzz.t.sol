@@ -86,6 +86,29 @@ contract OrderForgeFuzzTest is Test {
         assertEq(keccak256(abi.encode(decoded)), keccak256(abi.encode(order)));
     }
 
+    function testFuzz_multiplePartialFillsSettleExactSignedBuyAmount(
+        uint128 rawSellAmount,
+        uint128 rawBuyAmount,
+        uint128 rawFirstFill
+    ) external {
+        uint128 sellAmount = uint128(bound(rawSellAmount, 2, type(uint96).max / 2));
+        uint128 buyAmount = uint128(bound(rawBuyAmount, sellAmount, type(uint96).max));
+        uint128 firstFill = uint128(bound(rawFirstFill, 1, sellAmount - 1));
+
+        Order memory order = _order(sellAmount, buyAmount, 1002);
+        bytes memory signature = _sign(order);
+
+        vm.startPrank(taker);
+        uint256 firstPaid = forge.fillOrder(order, signature, firstFill);
+        uint256 secondPaid = forge.fillOrder(order, signature, sellAmount - firstFill);
+        vm.stopPrank();
+
+        assertEq(firstPaid + secondPaid, buyAmount);
+        assertEq(forge.filledSellAmount(forge.hashOrder(order)), sellAmount);
+        assertEq(sellToken.balanceOf(address(forge)), 0);
+        assertEq(buyToken.balanceOf(address(forge)), 0);
+    }
+
     function testFuzz_marketIdIsSymmetric(address tokenA, address tokenB, uint24 feeBps) external view {
         assertEq(codec.marketId(tokenA, tokenB, feeBps), codec.marketId(tokenB, tokenA, feeBps));
     }

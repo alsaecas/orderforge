@@ -3,12 +3,15 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 import {CodecHarness} from "../../src/CodecHarness.sol";
 import {IOrderForge} from "../../src/interfaces/IOrderForge.sol";
 import {OrderForge} from "../../src/OrderForge.sol";
 import {ExecutionPayload, Order, YieldPosition} from "../../src/types/OrderTypes.sol";
 import {Mock1271Wallet} from "../mocks/Mock1271Wallet.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
+import {MockFalseReturnERC20} from "../mocks/MockFalseReturnERC20.sol";
 
 contract OrderForgeTest is Test {
     uint256 internal constant MAKER_PK = 0xA11CE;
@@ -122,6 +125,34 @@ contract OrderForgeTest is Test {
         forge.fillOrder(order, signature, 10 ether);
     }
 
+    function test_malformedSignatureFailsSafely() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 28, keccak256("malformed-sig"));
+
+        vm.expectRevert(OrderForge.InvalidSignature.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, hex"deadbeef", 10 ether);
+    }
+
+    function test_mutatingSignedOrderInvalidatesSignature() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 29, keccak256("mutated-order"));
+        bytes memory signature = _sign(order, MAKER_PK);
+        order.buyAmount += 1;
+
+        vm.expectRevert(OrderForge.InvalidSignature.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 10 ether);
+    }
+
+    function test_signatureCannotReplayAcrossChainIds() external {
+        Order memory order = _order(100 ether, 200 ether, address(0), 30, keccak256("chain-domain"));
+        bytes memory signature = _sign(order, MAKER_PK);
+        vm.chainId(block.chainid + 1);
+
+        vm.expectRevert(OrderForge.InvalidSignature.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 10 ether);
+    }
+
     function test_makerCanCancelRemainingOrder() external {
         Order memory order = _order(100 ether, 200 ether, address(0), 6, keccak256("cancel"));
         bytes memory signature = _sign(order, MAKER_PK);
@@ -191,6 +222,61 @@ contract OrderForgeTest is Test {
 
         assertEq(sellToken.balanceOf(taker), 100 ether);
         assertEq(buyToken.balanceOf(address(wallet)), 200 ether);
+    }
+
+    function test_erc1271WalletRejectsSignatureFromNonOwner() external {
+        address walletOwner = vm.addr(0xD00D);
+        Mock1271Wallet wallet = new Mock1271Wallet(walletOwner);
+
+        Order memory order = _order(100 ether, 200 ether, address(0), 31, keccak256("1271-invalid"));
+        order.maker = address(wallet);
+        bytes memory signature = _sign(order, OTHER_PK);
+
+        vm.expectRevert(OrderForge.InvalidSignature.selector);
+        vm.prank(taker);
+        forge.fillOrder(order, signature, 100 ether);
+    }
+
+    function test_falseReturningBuyTokenRevertsAndRollsBackFillState() external {
+        MockFalseReturnERC20 falseToken = new MockFalseReturnERC20("False", "FALSE");
+        falseToken.mint(taker, 200 ether);
+        vm.prank(taker);
+        falseToken.approve(address(forge), type(uint256).max);
+
+        Order memory order = _order(100 ether, 200 ether, address(0), 32, keccak256("false-buy"));
+        order.buyToken = address(falseToken);
+        bytes memory signature = _sign(order, MAKER_PK);
+        bytes32 digest = forge.hashOrder(order);
+
+        vm.expectRevert(abi.encodeWithSelector(SafeERC20.SafeERC20FailedOperation.selector, address(falseToken)));
+        vm.prank(taker);
+        forge.fillOrder(order, signature, order.sellAmount);
+
+        assertEq(forge.filledSellAmount(digest), 0);
+        assertFalse(forge.nonceInvalidated(maker, order.nonce));
+        assertEq(forge.boundOrderHash(maker, order.nonce), bytes32(0));
+    }
+
+    function test_falseReturningSellTokenRevertsBothTransfersAtomically() external {
+        MockFalseReturnERC20 falseToken = new MockFalseReturnERC20("False", "FALSE");
+        falseToken.mint(maker, 100 ether);
+        vm.prank(maker);
+        falseToken.approve(address(forge), type(uint256).max);
+
+        Order memory order = _order(100 ether, 200 ether, address(0), 33, keccak256("false-sell"));
+        order.sellToken = address(falseToken);
+        bytes memory signature = _sign(order, MAKER_PK);
+        uint256 makerBuyBefore = buyToken.balanceOf(maker);
+        uint256 takerBuyBefore = buyToken.balanceOf(taker);
+
+        vm.expectRevert(abi.encodeWithSelector(SafeERC20.SafeERC20FailedOperation.selector, address(falseToken)));
+        vm.prank(taker);
+        forge.fillOrder(order, signature, order.sellAmount);
+
+        assertEq(buyToken.balanceOf(maker), makerBuyBefore);
+        assertEq(buyToken.balanceOf(taker), takerBuyBefore);
+        assertEq(forge.filledSellAmount(forge.hashOrder(order)), 0);
+        assertFalse(forge.nonceInvalidated(maker, order.nonce));
     }
 
     function test_standardAbiOrderRoundTrip() external view {

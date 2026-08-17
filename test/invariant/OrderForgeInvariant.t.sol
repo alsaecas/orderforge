@@ -19,6 +19,9 @@ contract SettlementHandler is Test {
 
     uint256 public ghostSellFilled;
     uint256 public ghostBuyPaid;
+    bool public fillSucceededAfterCancellation;
+    bool public fillSucceededAfterNonceInvalidation;
+    bool public fillSucceededAfterCompletion;
 
     constructor(
         OrderForge forge_,
@@ -41,14 +44,19 @@ contract SettlementHandler is Test {
     function fill(uint256 rawAmount) external {
         bytes32 digest = forge.hashOrder(_order);
         uint256 filled = forge.filledSellAmount(digest);
-        if (filled >= _order.sellAmount) return;
-        if (forge.cancelled(digest) || forge.nonceInvalidated(maker, _order.nonce)) return;
+        bool wasCompleted = filled == _order.sellAmount;
+        bool wasCancelled = forge.cancelled(digest);
+        bool wasNonceInvalidated = forge.nonceInvalidated(maker, _order.nonce);
+        uint128 amount = wasCompleted ? 1 : uint128(bound(rawAmount, 1, uint256(_order.sellAmount) - filled));
 
-        uint128 amount = uint128(bound(rawAmount, 1, uint256(_order.sellAmount) - filled));
         vm.prank(taker);
-        uint256 buyPaid = forge.fillOrder(_order, _signature, amount);
-        ghostSellFilled += amount;
-        ghostBuyPaid += buyPaid;
+        try forge.fillOrder(_order, _signature, amount) returns (uint256 buyPaid) {
+            if (wasCompleted) fillSucceededAfterCompletion = true;
+            if (wasCancelled) fillSucceededAfterCancellation = true;
+            if (wasNonceInvalidated && !wasCompleted) fillSucceededAfterNonceInvalidation = true;
+            ghostSellFilled += amount;
+            ghostBuyPaid += buyPaid;
+        } catch {}
     }
 
     function cancel() external {
@@ -140,5 +148,11 @@ contract OrderForgeInvariantTest is StdInvariant, Test {
         if (forge.filledSellAmount(digest) == order.sellAmount) {
             assertEq(handler.ghostBuyPaid(), order.buyAmount);
         }
+    }
+
+    function invariant_terminalStatesAlwaysBlockFurtherFills() external view {
+        assertFalse(handler.fillSucceededAfterCancellation());
+        assertFalse(handler.fillSucceededAfterNonceInvalidation());
+        assertFalse(handler.fillSucceededAfterCompletion());
     }
 }
