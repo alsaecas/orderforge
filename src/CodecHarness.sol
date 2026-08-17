@@ -25,11 +25,11 @@ contract CodecHarness {
         return AbiCodec.decodeExecution(data);
     }
 
-    function encodeFillCall(
-        Order calldata order,
-        bytes calldata signature,
-        uint128 sellFillAmount
-    ) external pure returns (bytes memory) {
+    function encodeFillCall(Order calldata order, bytes calldata signature, uint128 sellFillAmount)
+        external
+        pure
+        returns (bytes memory)
+    {
         return AbiCodec.encodeFillCall(order, signature, sellFillAmount);
     }
 

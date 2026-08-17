@@ -23,11 +23,11 @@ library AbiCodec {
     }
 
     /// @notice Produces strongly-typed calldata for IOrderForge.fillOrder.
-    function encodeFillCall(
-        Order memory order,
-        bytes memory signature,
-        uint128 sellFillAmount
-    ) internal pure returns (bytes memory) {
+    function encodeFillCall(Order memory order, bytes memory signature, uint128 sellFillAmount)
+        internal
+        pure
+        returns (bytes memory)
+    {
         return abi.encodeCall(IOrderForge.fillOrder, (order, signature, sellFillAmount));
     }
 }

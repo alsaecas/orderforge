@@ -160,9 +160,7 @@ contract OrderForgeTest is Test {
 
         bytes32 expectedHash = forge.hashOrder(firstOrder);
         bytes32 actualHash = forge.hashOrder(conflictingOrder);
-        vm.expectRevert(
-            abi.encodeWithSelector(OrderForge.NonceAlreadyBound.selector, 8, expectedHash, actualHash)
-        );
+        vm.expectRevert(abi.encodeWithSelector(OrderForge.NonceAlreadyBound.selector, 8, expectedHash, actualHash));
         vm.prank(taker);
         forge.fillOrder(conflictingOrder, conflictSig, 10 ether);
     }
@@ -212,11 +210,8 @@ contract OrderForgeTest is Test {
 
     function test_executionPayloadRoundTripIncludesDynamicSignature() external view {
         Order memory order = _order(100, 200, address(0), 12, keccak256("payload"));
-        ExecutionPayload memory original = ExecutionPayload({
-            order: order,
-            signature: hex"010203040506",
-            sellFillAmount: 25
-        });
+        ExecutionPayload memory original =
+            ExecutionPayload({order: order, signature: hex"010203040506", sellFillAmount: 25});
 
         bytes memory encoded = codec.encodeExecution(original);
         ExecutionPayload memory decoded = codec.decodeExecution(encoded);
@@ -267,13 +262,11 @@ contract OrderForgeTest is Test {
         assertNotEq(first, codec.yieldPositionId(position));
     }
 
-    function _order(
-        uint128 sellAmount,
-        uint128 buyAmount,
-        address allowedTaker,
-        uint256 nonce,
-        bytes32 salt
-    ) internal view returns (Order memory) {
+    function _order(uint128 sellAmount, uint128 buyAmount, address allowedTaker, uint256 nonce, bytes32 salt)
+        internal
+        view
+        returns (Order memory)
+    {
         return Order({
             maker: maker,
             allowedTaker: allowedTaker,

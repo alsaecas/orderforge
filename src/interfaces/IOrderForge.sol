@@ -13,11 +13,9 @@ interface IOrderForge {
         NonceInvalidated
     }
 
-    function fillOrder(
-        Order calldata order,
-        bytes calldata signature,
-        uint128 sellFillAmount
-    ) external returns (uint256 buyFillAmount);
+    function fillOrder(Order calldata order, bytes calldata signature, uint128 sellFillAmount)
+        external
+        returns (uint256 buyFillAmount);
 
     function cancelOrder(Order calldata order) external;
 

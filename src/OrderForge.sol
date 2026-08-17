@@ -51,11 +51,11 @@ contract OrderForge is IOrderForge, EIP712, ReentrancyGuard {
 
     constructor() EIP712("OrderForge", "1") {}
 
-    function fillOrder(
-        Order calldata order,
-        bytes calldata signature,
-        uint128 sellFillAmount
-    ) external nonReentrant returns (uint256 buyFillAmount) {
+    function fillOrder(Order calldata order, bytes calldata signature, uint128 sellFillAmount)
+        external
+        nonReentrant
+        returns (uint256 buyFillAmount)
+    {
         _validateOrderShape(order);
 
         if (order.expiry < block.timestamp) revert OrderExpired(order.expiry);
@@ -82,18 +82,8 @@ contract OrderForge is IOrderForge, EIP712, ReentrancyGuard {
         uint128 newFilled = alreadyFilled + sellFillAmount;
 
         // Cumulative rounding avoids per-fill drift: the final fill always totals exactly buyAmount.
-        uint256 buyBefore = Math.mulDiv(
-            alreadyFilled,
-            order.buyAmount,
-            order.sellAmount,
-            Math.Rounding.Ceil
-        );
-        uint256 buyAfter = Math.mulDiv(
-            newFilled,
-            order.buyAmount,
-            order.sellAmount,
-            Math.Rounding.Ceil
-        );
+        uint256 buyBefore = Math.mulDiv(alreadyFilled, order.buyAmount, order.sellAmount, Math.Rounding.Ceil);
+        uint256 buyAfter = Math.mulDiv(newFilled, order.buyAmount, order.sellAmount, Math.Rounding.Ceil);
         buyFillAmount = buyAfter - buyBefore;
         if (buyFillAmount == 0) revert ZeroBuyFill();
 
@@ -156,9 +146,9 @@ contract OrderForge is IOrderForge, EIP712, ReentrancyGuard {
     }
 
     function _validateOrderShape(Order calldata order) private pure {
-        if (
-            order.maker == address(0) || order.sellToken == address(0) || order.buyToken == address(0)
-        ) revert ZeroAddress();
+        if (order.maker == address(0) || order.sellToken == address(0) || order.buyToken == address(0)) {
+            revert ZeroAddress();
+        }
         if (order.sellToken == order.buyToken) revert SameToken();
         if (order.sellAmount == 0 || order.buyAmount == 0) revert ZeroAmount();
     }

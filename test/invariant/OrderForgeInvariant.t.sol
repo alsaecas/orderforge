@@ -123,12 +123,10 @@ contract OrderForgeInvariantTest is StdInvariant, Test {
 
     function invariant_tokenConservationAlwaysHolds() external view {
         assertEq(
-            sellToken.balanceOf(maker) + sellToken.balanceOf(taker) + sellToken.balanceOf(address(forge)),
-            INITIAL_SELL
+            sellToken.balanceOf(maker) + sellToken.balanceOf(taker) + sellToken.balanceOf(address(forge)), INITIAL_SELL
         );
         assertEq(
-            buyToken.balanceOf(maker) + buyToken.balanceOf(taker) + buyToken.balanceOf(address(forge)),
-            INITIAL_BUY
+            buyToken.balanceOf(maker) + buyToken.balanceOf(taker) + buyToken.balanceOf(address(forge)), INITIAL_BUY
         );
     }
 
