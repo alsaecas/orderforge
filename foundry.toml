@@ -19,6 +19,9 @@ runs = 256
 depth = 64
 fail_on_revert = true
 
+[profile.ci]
+# Declaring the parent table preserves default project paths on older Foundry releases.
+
 [profile.ci.fuzz]
 runs = 4096
 

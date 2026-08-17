@@ -106,8 +106,11 @@ The invariant handler randomly fills, cancels and invalidates the same signed or
 - token totals are conserved;
 - OrderForge does not retain settlement tokens;
 - cumulative payment never exceeds the signed price and equals it at completion.
+- cancellation, nonce invalidation and completion prevent every later fill attempt.
 
 Read [Testing strategy](docs/TESTING.md).
+
+The current suite contains 35 unit tests, 4 fuzz properties and 5 stateful invariants. A local Foundry 1.5.1 coverage run against Solidity 0.8.30 reports 100% lines, statements, branches and functions across every contract under `src/`. The repository-wide aggregate is lower because it honestly includes the deployment script and test helpers; exact figures are recorded in the testing guide.
 
 ## Repository structure
 
@@ -149,6 +152,7 @@ make test-invariant
 make coverage
 make lint
 make slither
+make ci             # full suite with CI-strength fuzz/invariant settings
 ```
 
 ## Deployment

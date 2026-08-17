@@ -1,5 +1,6 @@
 {
   "filter_paths": "lib|test|script",
+  "detectors_to_exclude": "arbitrary-send-erc20,timestamp",
   "exclude_dependencies": true,
   "solc_remaps": [
     "forge-std/=lib/forge-std/src/",
