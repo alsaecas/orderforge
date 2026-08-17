@@ -1,0 +1,65 @@
+name: Quality checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  foundry:
+    name: Foundry / Solidity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          forge install foundry-rs/forge-std@v1.16.2 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.4.0 --no-git
+
+      - name: Formatting
+        run: forge fmt --check
+
+      - name: Foundry lint
+        run: forge lint
+
+      - name: Build
+        run: forge build --sizes
+
+      - name: Unit, fuzz and invariant tests
+        run: forge test -vvv
+
+      - name: Coverage summary
+        run: forge coverage --report summary
+
+  slither:
+    name: Slither static analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.7.1
+      - name: Install dependencies
+        run: |
+          forge install foundry-rs/forge-std@v1.16.2 --no-git
+          forge install OpenZeppelin/openzeppelin-contracts@v5.4.0 --no-git
+      - name: Install Slither
+        run: pipx install slither-analyzer==0.11.5
+      - name: Run Slither
+        run: slither . --config-file slither.config.json

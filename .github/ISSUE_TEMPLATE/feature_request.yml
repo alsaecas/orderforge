@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose a focused protocol, testing, or developer-experience improvement.
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What concrete limitation or developer need does this address?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful design and its expected behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: security
+    attributes:
+      label: Security / trust impact
+      description: Does this alter signature semantics, permissions, token custody, replay protection, or trust boundaries?
+    validations:
+      required: true
+  - type: textarea
+    id: testing
+    attributes:
+      label: Test strategy
+      description: Which unit, fuzz, invariant, or static-analysis checks should accompany the change?

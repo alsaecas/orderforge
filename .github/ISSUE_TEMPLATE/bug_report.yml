@@ -1,0 +1,36 @@
+name: Bug report
+description: Report a reproducible defect in OrderForge.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve OrderForge. For security vulnerabilities, use the private security advisory link instead.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include the smallest Foundry test, call sequence, or commit reference that reproduces the issue.
+      render: solidity
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit / version
+      placeholder: e.g. main @ abc1234
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: Explain any effect on signatures, settlement, accounting, token flows, or developer tooling.
